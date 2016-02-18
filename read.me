@@ -1,0 +1,73 @@
+En ce qui concerne la session ssh mode paranoid(Option2),
+l'exercice, (tenter de ne pas reveler l'adresse source avant la connexion ssh et garder les paquets du knocking indifferentiables parmis ceux entrants sur le serveur)
+ne fonctionne pas ailleur qu'en local :
+la quasi-totalité des operateurs filtrent les paquets ne possedant pas la bonne adresse source.
+(exemple type d'un travail inutile par manque de methode)
+d'autre part il s'avere insatisfaisant. 
+D'abord le fait d'utiliser de fausses adresses sources dans les paquets UDP, pour quelqu'un s'investissant dans un FAI et pretendant "faire du reseau", est malvenu.
+De fait, d'un point de vue reseau "c'est sale".
+Ensuite une personne décidée en capacité d'analiser le traffic entrant sur le serveur, qui chercherait la methode utilisée la trouverait.
+La solidité de la clef ssh reste la seule garantie.
+Ceci dit, j'ai trouvé l'exercice interessant, parce qu'il mobilise des connaissances reseau, des connaissances en programation(ok modestes) et un peu de reflexion.
+En pratique seule la premiere option est donc utilisée.
+
+Une alternative possible proposé par Youpi et Simon au mode paranoid :
+utiliser une autre machine pour pinguer toute les secondes le roueur avec quelque données dedans (2.5bit)
+par exemple avec un même generateur de nombre pseudo-aléatoire des deux cotés, lorsque je veux 
+ouvrir le port ssh, je me connecte d'abord sur cette machine et j'envoi une
+sequence qui n'est pas pseudo aléatoire, le script coté routeur le detecte et
+ouvre le port ssh.
+
+
+merci à Youpi d'avoir pris le temps de me lire 
+merci à Lotusbleu de m'avoir parlé du port-knocking
+
+
+
+
+configuration :
+
+une machine cliente avec netcat et netfilter/iptables  (client ssh)
+un routeur sous openwrt avec netfilter/iptables et nmap
+une machine cible, derriere le routeur (serveur ssh)
+
+
+
+la (mauvaise) idée du mode pranoid :
+
+Pour que ça passe inaperçu il faut que transmission diffuse un ou deux porn en p2p,
+(ou un truc sympa, ou un truc legal, ou un truc utile, ou un truc sympa legal et utile) 
+et récuperer le port vers lequel il redirige (51413 par default) pour l'utiliser par le
+client comme port de destination.
+Il faut également que l'adresse source ne se voit pas
+lors de l'envoi des knocking-paquets. Pour ça le client 
+recupere son adresse (la vrai adresse source) et la cache dans les paquets auxquels iptables
+assigne une fausse adresse source. Dans un paquet on a le
+motif de l'adresse source. Admettons que la veritable adresse source soit
+25.45.26.182 la fausse adresse source du paquet aurait donc 2 chiffres
+puis 2, puis 2, puis 3, par exemple: 44.58.32.164 (la si le premier terme(44) est
+un chiffre pair cela signifit que l'operation sur le port source du second paquet(sur le 1er
+terme) doit etre une addition(+7), s'il est impair 
+une soustraction(-7)(pareil pour les autres termes). 
+Dans l'autre(s) paquet(s) on cache la veritable adresse source (et on evite le parse,
+c'est pour ça qu'on s'emmerde a faire tout ça)
+: dans le port source d'abord on ajoute les deux premieres parties soit 2545.
+pour eviter le parse on va prendre un nombre (admettons 7) qu'on va
+additioner a chaque terme soit 25+7 et 45+7 ce qui nous donnera comme port
+source: 3252.
+pour la seconde partie de l'adresse: 26.182 on peux la mettre 
+dans la fausse adresse source. 
+26+7=33 et 182+7=189. la fausse adresse source du paquet
+: 33.xxx.189.xx 
+reste a faire reconstituer ça par les scripts.) 
+
+
+Le premier paquet on le repere grace a deux termes toujours identiques dans son
+adresse source. Les deux autres termes ainsi que le port source contiennent la
+veritable adresse de destination.
+(!possibilité non nulle qu'un autre paquet possede
+également les deux termes de reconnaissance.  
+Le second, le paquet-motif est reperé grace a son port source, il
+n'aura jammais la même adresse source.
+(si la veritable adresse source contient plus de huit chiffres, 
+envoyer un troisieme paquet contenant les derniers chiffres dans le port source.
